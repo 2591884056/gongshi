@@ -41,7 +41,7 @@
 
   const state = {
     records: [],
-    settings: { team: '', rosterText: '', printDetail: false, lastBackupAt: 0 },
+    settings: { team: '', rosterText: '', printDetail: false, lastBackupAt: 0, typeColors: {} },
     parsed: null, // 当前识别结果（还没保存）
     lastSaved: null, // 刚保存完，显示「看报表」入口
     pasteHint: null, // 'android-multi'：安卓上多选复制只粘进来一条
@@ -110,6 +110,24 @@
     return d.getMonth() + 1 + '月' + d.getDate() + '日';
   }
   const fmtDateW = (s) => fmtDate(s) + ' 周' + R.weekday(s);
+
+  /* 工种标签的颜色：每个工种第一次出现时分一个颜色，记在设置里，以后一直是这个颜色。
+   * 常见的几个固定颜色；其他工种先用没被固定的颜色，用完了再轮着用。红色留给报表里的「没上班」，不用 */
+  const TYPE_PRESET = { 打钻: 0, 出渣: 1, 挂网: 2, 喷浆: 3 };
+  const TYPE_ORDER = [4, 5, 6, 7, 8, 9, 0, 1, 2, 3]; // 对应 css 里的 .tc0 ~ .tc9
+  function typeColor(type) {
+    const map = state.settings.typeColors || (state.settings.typeColors = {});
+    if (map[type] == null) {
+      const used = new Set(Object.keys(map).map((k) => map[k]));
+      let i = TYPE_PRESET[type];
+      if (i == null || used.has(i)) i = TYPE_ORDER.find((c) => !used.has(c));
+      if (i == null) i = TYPE_ORDER[Object.keys(map).length % TYPE_ORDER.length];
+      map[type] = i;
+      saveSoon();
+    }
+    return map[type];
+  }
+  const typeTag = (type) => '<span class="rec-type ' + (type ? 'tc' + typeColor(type) : 'tc-none') + '">' + esc(type || '未写工种') + '</span>';
   const monthLabel = (ym) => ym.slice(0, 4) + '年' + +ym.slice(5, 7) + '月';
   const timeText = (r) => (r.start && r.end ? r.start + '–' + r.end : r.end ? r.end + ' 下班' : '没写下班时间');
   const mismatch = (r) => r.declared != null && r.declared !== r.names.length;
@@ -284,7 +302,7 @@
       '<input type="checkbox" data-act="toggle" data-i="' + i + '"' + (r._checked ? ' checked' : '') + (selectable(r) ? '' : ' disabled') + '>' +
       '<div class="rec-body"><div class="rec-title">' +
       '<b>' + esc(r.date ? fmtDateW(r.date) : '日期不对') + '</b>' +
-      '<span class="rec-type">' + esc(r.type || '未写工种') + '</span>' +
+      typeTag(r.type) +
       '<span class="rec-meta">' + esc(meta.join(' · ')) + '</span>' +
       '<span class="status ' + st[1] + '">' + st[0] + '</span></div>' +
       (r._status === 'replace' ? '<div class="rec-note">同一班已经存过一条（' + r._old.names.length + ' 人），保存后用这条替换</div>' : '') +
@@ -541,7 +559,7 @@
         const names = r.names.map((n) => (q && n.indexOf(q) >= 0 ? '<mark>' + esc(n) + '</mark>' : esc(n))).join('、');
         html +=
           '<div class="rec-card stored"><div class="rec-body"><div class="rec-title">' +
-          '<span class="rec-type">' + esc(r.type || '未写工种') + '</span>' +
+          typeTag(r.type) +
           '<span class="rec-meta">' + r.names.length + ' 人 · ' + esc(timeText(r)) + '</span>' +
           (mismatch(r) ? '<span class="status st-warn">人数对不上：写的 ' + r.declared + ' 人</span>' : '') +
           '</div><div class="rec-names">' + names + '</div></div>' +
@@ -638,6 +656,7 @@
       type: rp.type === '*' ? null : rp.type,
       roster: roster(),
       hideEmpty: rp.hideEmpty,
+      today: todayYmd(), // 标出每个人没上班的日子
     });
   }
 
@@ -673,19 +692,20 @@
 
   function tableHtml(rep) {
     const rosterOn = roster().length > 0;
-    const weCls = (d) => (R.isWeekend(d) ? ' we' : '');
     let h =
       '<div class="table-wrap"><table class="rpt' + (rep.dates.length > 16 ? ' dense' : '') + '">' +
       '<colgroup><col class="c-no"><col class="c-name">' + rep.dates.map(() => '<col class="c-day">').join('') + '<col class="c-total"><col class="c-days"></colgroup>' +
       '<thead><tr><th class="c-no">序号</th><th class="c-name">姓名</th>';
-    rep.dates.forEach((d, i) => (h += '<th class="c-day' + weCls(d) + '">' + R.dayLabel(d, i) + '<small>' + R.weekday(d) + '</small></th>'));
+    rep.dates.forEach((d, i) => (h += '<th class="c-day">' + R.dayLabel(d, i) + '<small>' + R.weekday(d) + '</small></th>'));
     h += '<th class="c-total">合计<small>次</small></th><th class="c-days">出勤<small>天数</small></th></tr></thead><tbody>';
     rep.rows.forEach((row) => {
       h += '<tr' + (row.count ? '' : ' class="empty-row"') + '><td class="c-no">' + row.no + '</td><td class="c-name">' + esc(row.name) +
         (rosterOn && !row.inRoster ? '<i class="tag-out" title="不在人员名单里">名单外</i>' : '') + '</td>';
       rep.dates.forEach((d) => {
         const v = row.cells[d];
-        h += '<td class="c-day' + weCls(d) + '">' + (v ? num(v) : row.missing[d] ? '<span class="miss">?</span>' : '') + '</td>';
+        h += row.absent[d]
+          ? '<td class="c-day absent" title="没上班"></td>'
+          : '<td class="c-day">' + (v ? num(v) : row.missing[d] ? '<span class="miss">?</span>' : '') + '</td>';
       });
       h += '<td class="c-total">' + num(row.total) + '</td><td class="c-days">' + (row.days || '') + '</td></tr>';
     });
@@ -725,7 +745,7 @@
       '<div class="table-wrap"><table class="dtl"><thead><tr><th>序号</th><th>日期</th><th>工种</th><th>人数</th><th>时间</th><th>人员</th></tr></thead><tbody>';
     rep.records.forEach((r, i) => {
       h +=
-        '<tr><td>' + (i + 1) + '</td><td>' + esc(fmtDateW(r.date)) + '</td><td>' + esc(r.type || '—') + '</td><td>' + r.names.length +
+        '<tr><td>' + (i + 1) + '</td><td>' + esc(fmtDateW(r.date)) + '</td><td>' + typeTag(r.type) + '</td><td>' + r.names.length +
         (mismatch(r) ? '<span class="miss">（写的 ' + r.declared + '）</span>' : '') + '</td><td>' + esc(timeText(r)) + '</td><td class="names">' + esc(r.names.join('、')) + '</td></tr>';
     });
     return h + '</tbody></table></div></div>';
@@ -1173,7 +1193,7 @@
     }
     const res = P.parse(S.demoText(m, last), { refDate: new Date(y, m - 1, last) });
     state.records = res.records.filter((r) => r.date && r.names.length).map((r) => toStored(r));
-    state.settings = { team: '示例开挖班', rosterText: S.NAMES.join('\n'), printDetail: false, lastBackupAt: 0 };
+    state.settings = { team: '示例开挖班', rosterText: S.NAMES.join('\n'), printDetail: false, lastBackupAt: 0, typeColors: {} };
     save();
   }
 

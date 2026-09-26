@@ -15,7 +15,7 @@
   --err-bg: #fdeceb;
   --ok: #117a3d;
   --ok-bg: #e8f7ee;
-  --weekend: #fff6e6;
+  --absent: #f6b3aa;
   --head: #f3f5f8;
   --radius: 10px;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
@@ -116,7 +116,19 @@ textarea.input { resize: vertical; line-height: 1.6; }
 .rec-card.is-off .rec-body { opacity: 0.7; }
 .rec-body { flex: 1; min-width: 0; }
 .rec-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
-.rec-type { background: #eef1f5; border-radius: 6px; padding: 0 8px; font-size: 13px; line-height: 22px; }
+.rec-type { background: #eef1f5; border-radius: 6px; padding: 0 8px; font-size: 13px; line-height: 22px; font-weight: 500; white-space: nowrap; }
+/* 工种标签颜色（见 app.js typeColor）；不用红色，红色留给报表里的「没上班」 */
+.tc0 { background: #e2ecff; color: #1d4fc4; }
+.tc1 { background: #ffe9d1; color: #9a4f00; }
+.tc2 { background: #dcf3e4; color: #17703a; }
+.tc3 { background: #ede4fb; color: #6a3db0; }
+.tc4 { background: #d7f1f0; color: #0c6b69; }
+.tc5 { background: #f1e6d9; color: #7a4e24; }
+.tc6 { background: #e3e5fb; color: #3b43a6; }
+.tc7 { background: #ebf1d3; color: #55650f; }
+.tc8 { background: #f8e1f2; color: #9a2a82; }
+.tc9 { background: #dbeff8; color: #0b6690; }
+.tc-none { background: #eef1f5; color: #6b7280; }
 .rec-meta { color: var(--muted); font-size: 13px; }
 .status { font-size: 12px; border-radius: 999px; padding: 0 8px; line-height: 20px; margin-left: auto; white-space: nowrap; }
 .st-new { background: var(--ok-bg); color: var(--ok); }
@@ -180,8 +192,7 @@ table.rpt { border-collapse: separate; border-spacing: 0; font-size: 13px; font-
 .rpt th, .rpt td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: center; padding: 5px 2px; white-space: nowrap; background: #fff; }
 .rpt thead th { position: sticky; top: 0; z-index: 2; background: var(--head); font-weight: 600; line-height: 1.2; }
 .rpt th small { display: block; margin-top: 2px; font-weight: 400; font-size: 11px; color: var(--muted); }
-.rpt th.we small { color: #b45309; }
-.rpt td.we { background: var(--weekend); }
+.rpt td.absent { background: var(--absent); }
 .rpt .c-no { position: sticky; left: 0; z-index: 1; width: 38px; min-width: 38px; color: var(--muted); }
 .rpt .c-name { position: sticky; left: 38px; z-index: 1; min-width: 68px; padding: 5px 8px; text-align: left; box-shadow: 1px 0 0 var(--line-strong); }
 .rpt thead .c-no, .rpt thead .c-name { z-index: 3; }
@@ -259,7 +270,7 @@ body.modal-open { overflow: hidden; }
   .btn-danger-ghost:hover { background: var(--err-bg); }
   .btn-danger:hover { background: #9a1e14; }
   .btn-danger-outline:hover { background: var(--err-bg); }
-  .rpt tbody tr:hover td { background: #f3f7ff; }
+  .rpt tbody tr:hover td:not(.absent) { background: #f3f7ff; }
 }
 
 /* ============ 手机 ============ */
@@ -298,7 +309,7 @@ body.modal-open { overflow: hidden; }
   table.rpt.dense { font-size: 8.5pt; }
   .rpt th, .rpt td { position: static !important; border: 0.6pt solid #444 !important; padding: 2.5pt 0; box-shadow: none !important; background: #fff !important; color: #000; min-width: 0 !important; }
   .rpt thead th, .rpt tfoot td { background: #ececec !important; }
-  .rpt td.we, .rpt th.we { background: #f5f5f5 !important; }
+  .rpt td.c-day.absent { background: #f6b3aa !important; }
   .rpt th small { color: #444; font-size: 7.5pt; }
   .rpt col.c-no { width: 8mm; }
   .rpt col.c-name { width: 17mm; }

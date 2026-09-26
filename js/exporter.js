@@ -14,7 +14,7 @@
   const CENTER = { horizontal: 'center', vertical: 'middle' };
   const fill = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
   const HEAD_FILL = fill('FFEFF2F6');
-  const WEEKEND_FILL = fill('FFFFF4E0');
+  const ABSENT_FILL = fill('FFF6B3AA'); // 没上班的格子（和页面上的红色一致）
   const NUM_FMT = 'General;-General;;@'; // 0 显示为空白，和手写表一样干净
 
   function eachCell(ws, r1, c1, r2, c2, fn) {
@@ -107,7 +107,7 @@
       if (r >= FIRST) cell.numFmt = NUM_FMT;
       const d = c >= C_DAY0 && c < C_TOTAL ? rep.dates[c - C_DAY0] : null;
       if (r <= WEEK || r === TOTAL_ROW) cell.fill = HEAD_FILL;
-      else if (d && R.isWeekend(d)) cell.fill = WEEKEND_FILL;
+      else if (d && rep.rows[r - FIRST].absent[d]) cell.fill = ABSENT_FILL;
     });
     ws.getRow(HEAD).height = 18;
     ws.getRow(WEEK).height = 16;
@@ -228,8 +228,19 @@
     const SUB_H = 22;
     const HEAD_H = 42;
     const ROW_H = 28;
-    const FOOT_H = 40;
-    const W = tableW + PAD * 2;
+    // 说明文字按句子分行，免得表格窄（日期少）的时候一行放不下被切掉
+    probe.font = '12px ' + FONT;
+    const legendLines = info.legend.split('。').filter((t) => t.trim()).map((t) => t + '。');
+    const legendW = Math.max(...legendLines.map((t) => Math.ceil(probe.measureText(t).width)));
+    const LINE_H = 18;
+    const FOOT_H = 14 + legendLines.length * LINE_H;
+    // 画布要放得下标题、副标题、表格、说明里最宽的那个；日期少时表格窄，标题行反而更宽
+    probe.font = 'bold 20px ' + FONT;
+    const titleW = Math.ceil(probe.measureText(info.title).width);
+    probe.font = '12px ' + FONT;
+    const subW = Math.ceil(probe.measureText(info.subtitle).width);
+    const W = Math.max(tableW, legendW, titleW, subW) + PAD * 2;
+    const x0 = Math.round((W - tableW) / 2); // 表格居中
     const H = PAD + TITLE_H + SUB_H + 12 + HEAD_H + ROW_H * (rep.rows.length + 1) + FOOT_H + PAD;
     const scale = Math.min(2, Math.sqrt(16e6 / (W * H))); // iOS 对画布像素数有上限
     const cv = document.createElement('canvas');
@@ -249,7 +260,7 @@
     g.font = '12px ' + FONT;
     g.fillText(info.subtitle, W / 2, PAD + TITLE_H + SUB_H / 2);
 
-    const x = [PAD];
+    const x = [x0];
     widths.forEach((w, i) => x.push(x[i] + w));
     const top = PAD + TITLE_H + SUB_H + 12;
     const bodyTop = top + HEAD_H;
@@ -257,19 +268,18 @@
     const nDay = rep.dates.length;
     const fmt = (v) => (v ? String(Math.round(v * 100) / 100) : '');
 
-    // 底色：表头、周末列、斑马纹、合计行
+    // 底色：表头、斑马纹、没上班的格子（红）、合计行
     g.fillStyle = '#eff2f6';
     g.fillRect(x[0], top, tableW, HEAD_H);
-    rep.dates.forEach((d, i) => {
-      if (!R.isWeekend(d)) return;
-      g.fillStyle = '#fff4e0';
-      g.fillRect(x[2 + i], bodyTop, dayW, ROW_H * rep.rows.length);
-    });
     rep.rows.forEach((row, i) => {
       if (i % 2 === 0) return;
       g.fillStyle = 'rgba(0,0,0,0.025)';
       g.fillRect(x[0], bodyTop + i * ROW_H, tableW, ROW_H);
     });
+    g.fillStyle = '#f6b3aa';
+    rep.rows.forEach((row, i) =>
+      rep.dates.forEach((d, j) => row.absent[d] && g.fillRect(x[2 + j], bodyTop + i * ROW_H, dayW, ROW_H))
+    );
     g.fillStyle = '#eff2f6';
     g.fillRect(x[0], bottom - ROW_H, tableW, ROW_H);
 
@@ -284,7 +294,7 @@
       g.fillStyle = '#222';
       g.fillText(R.dayLabel(d, i), mid(2 + i), top + 15);
       g.font = '11px ' + FONT;
-      g.fillStyle = R.isWeekend(d) ? '#b45309' : '#777';
+      g.fillStyle = '#777';
       g.fillText(R.weekday(d), mid(2 + i), top + 31);
     });
     g.font = 'bold 13px ' + FONT;
@@ -344,7 +354,8 @@
     g.fillStyle = '#888';
     g.font = '12px ' + FONT;
     g.textAlign = 'left';
-    g.fillText(info.legend, x[0], bottom + FOOT_H / 2);
+    const legendX = legendW > tableW ? Math.round((W - legendW) / 2) : x0;
+    legendLines.forEach((t, i) => g.fillText(t, legendX, bottom + 14 + LINE_H * i + LINE_H / 2));
     return cv;
   }
 

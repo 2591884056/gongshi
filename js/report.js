@@ -33,10 +33,6 @@
     return out;
   }
   const weekday = (s) => WEEK[parseYmd(s).getDay()];
-  const isWeekend = (s) => {
-    const d = parseYmd(s).getDay();
-    return d === 0 || d === 6;
-  };
   function monthRange(ym) {
     const [y, m] = ym.split('-').map(Number);
     return { from: y + '-' + pad(m) + '-01', to: y + '-' + pad(m) + '-' + pad(new Date(y, m, 0).getDate()) };
@@ -84,6 +80,9 @@
    * @param {object} [opts.hoursByType]   { 打钻: 6 } 没有上班时间时每次按几小时算
    * @param {Array} [opts.roster]         人员名单（决定排序、别名合并）
    * @param {boolean} [opts.hideEmpty]    隐藏区间内没有记录的名单人员
+   * @param {string} [opts.today]         'YYYY-MM-DD'。给了就标出每个人没上班的日子（row.absent）：
+   *                                      今天以前、这个人这天没有任何记录。只看某个工种时不标，
+   *                                      那时空着只说明没干这个工种，不代表没上班
    */
   function build(records, opts) {
     opts = opts || {};
@@ -134,10 +133,14 @@
       });
     });
 
+    const markAbsent = !!opts.today && type === null;
     rows.forEach((row) => {
       // 出勤天数按「有没有来」算，和口径无关
       row.days = dates.filter((d) => row.cells[d] !== undefined).length;
       row.total = metric === 'hours' ? row.hours : row.count;
+      row.absent = {};
+      // 今天还没过完（夜班要到明天凌晨才下班），只看今天以前
+      if (markAbsent) dates.forEach((d) => d < opts.today && row.cells[d] === undefined && (row.absent[d] = true));
     });
     const shown = opts.hideEmpty ? rows.filter((r) => r.count > 0) : rows;
     shown.forEach((r, i) => (r.no = i + 1));
@@ -151,6 +154,7 @@
       types, // 区间内出现过的工种（给筛选下拉框用）
       listTypes: uniq(list.map((r) => r.type || '')).sort(), // 当前筛选后出现的工种（个人汇总分列用）
       rows: shown,
+      markAbsent,
       colTotals,
       grand: round2(shown.reduce((s, r) => s + r.total, 0)),
       totalCount: shown.reduce((s, r) => s + r.count, 0),
@@ -172,9 +176,10 @@
     const metricLabel = rep.metric === 'hours' ? '工时（小时）' : '出勤次数';
     const subtitle = '统计区间：' + rep.from + ' 至 ' + rep.to + '　工种：' + typeLabel + '　口径：' + metricLabel;
     const legend =
-      rep.metric === 'hours'
+      (rep.metric === 'hours'
         ? '表中数字 = 当天工时（小时）。有上下班时间的按实际计算，只有下班时间的按「设置」里的每次工时计算。'
-        : '表中数字 = 当天出勤次数（群里一条报工消息算一次）。';
+        : '表中数字 = 当天出勤次数（群里一条报工消息算一次）。') +
+      (rep.markAbsent ? '红色格子 = 这天没上班（今天和以后的日子不标）。' : '');
     const fileBase = (team ? team + '_' : '') + (full ? y + '年' + m + '月' : rep.from + '至' + rep.to) + '_考勤统计';
     return { title, subtitle, typeLabel, metricLabel, legend, fileBase };
   }
@@ -187,7 +192,6 @@
     monthRange,
     isFullMonth,
     weekday,
-    isWeekend,
     dayLabel,
     parseYmd,
     ymd,
