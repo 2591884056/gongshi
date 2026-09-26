@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN" translate="no" data-version="ea53461901">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="google" content="notranslate">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="工时统计">
+  <title>工时统计</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/app.css?v=ea53461901">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">工</span>
+        <span class="brand-name">工时统计</span>
+        <span class="brand-team" id="brand-team"></span>
+      </div>
+      <nav class="tabs" id="tabs">
+        <a href="#input" data-view="input">录入</a>
+        <a href="#records" data-view="records">记录<span class="tab-badge" id="rec-count"></span></a>
+        <a href="#report" data-view="report">报表</a>
+        <a href="#settings" data-view="settings">设置</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="banner banner-wechat" id="wechat-tip" hidden>
+      <span><b>请在浏览器里打开：</b>点右上角「···」→「在浏览器打开」（苹果手机选「在 Safari 中打开」），再装到手机桌面，以后都从桌面图标打开。在微信里打开不能离线使用，数据也和浏览器里的分开存。</span>
+      <button class="banner-close" type="button" data-act="close-banner" aria-label="关闭">×</button>
+    </div>
+    <div class="banner banner-install" id="install-tip" hidden></div>
+    <div class="banner banner-demo" id="demo-bar" hidden>
+      <span>演示模式：名字都是虚构的，数据和正式数据分开保存。</span>
+      <a href="./">退出演示</a>
+    </div>
+
+    <!-- 录入 -->
+    <section class="view" id="view-input" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>粘贴群消息</h2>
+          <span class="muted">可以一次粘贴多条</span>
+        </div>
+        <textarea id="paste-box" class="paste-box" rows="7" spellcheck="false" autocomplete="off"
+          placeholder="例：&#10;9月 7号打钻13人&#10;郑国栋，何文杰，程立平……&#10;13点 下班"></textarea>
+        <div class="btn-row">
+          <button class="btn" id="btn-clip" type="button">粘贴</button>
+          <button class="btn btn-primary" id="btn-parse" type="button">识别</button>
+          <button class="btn btn-ghost" id="btn-clear" type="button">清空</button>
+          <span class="spacer"></span>
+          <button class="btn btn-link" id="btn-sample" type="button">填入示例</button>
+        </div>
+        <p class="tip" id="paste-tip">在微信里长按消息 →「复制」（也可以多选好几条再复制），回到这里点「粘贴」。电脑上按 Ctrl+V（Mac 按 ⌘V）。</p>
+      </div>
+      <div id="parse-result"></div>
+    </section>
+
+    <!-- 记录 -->
+    <section class="view" id="view-records" hidden>
+      <div class="card toolbar" id="records-toolbar"></div>
+      <div id="records-list"></div>
+    </section>
+
+    <!-- 报表 -->
+    <section class="view" id="view-report" hidden>
+      <div class="card no-print" id="report-controls"></div>
+      <div class="sheet" id="report-sheet"></div>
+      <div class="sheet detail-sheet" id="detail-sheet"></div>
+    </section>
+
+    <!-- 设置 -->
+    <section class="view" id="view-settings" hidden></section>
+  </main>
+
+  <div class="modal" id="modal" hidden>
+    <div class="modal-mask" data-act="close-modal"></div>
+    <div class="modal-box" id="modal-box" role="dialog" aria-modal="true"></div>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script src="js/parser.js?v=ea53461901"></script>
+  <script src="js/report.js?v=ea53461901"></script>
+  <script src="js/exporter.js?v=ea53461901"></script>
+  <script src="js/sample.js?v=ea53461901"></script>
+  <script src="js/app.js?v=ea53461901"></script>
+</body>
+</html>
