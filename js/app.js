@@ -709,11 +709,12 @@
           ? '<td class="c-day absent" title="没上班"></td>'
           : '<td class="c-day">' + (v ? num(v) : row.missing[d] ? '<span class="miss">?</span>' : '') + '</td>';
       });
-      h += '<td class="c-total">' + num(row.total) + '</td><td class="c-days">' + (row.days || '') + '</td></tr>';
+      // 出勤天数留空，打印出来手写（客户要求）；report.js 仍然算出 row.days，需要时再显示
+      h += '<td class="c-total">' + num(row.total) + '</td><td class="c-days"></td></tr>';
     });
     h += '</tbody><tfoot><tr><td class="c-no"></td><td class="c-name">合计</td>';
     rep.dates.forEach((d) => (h += '<td class="c-day">' + num(rep.colTotals[d]) + '</td>'));
-    h += '<td class="c-total">' + num(rep.grand) + '</td><td class="c-days">' + (rep.rows.reduce((s, r) => s + r.days, 0) || '') + '</td></tr></tfoot></table></div>';
+    h += '<td class="c-total">' + num(rep.grand) + '</td><td class="c-days"></td></tr></tfoot></table></div>';
     return h;
   }
 

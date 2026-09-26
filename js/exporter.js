@@ -88,7 +88,7 @@
       const range = L(C_DAY0) + r + ':' + L(C_TOTAL - 1) + r;
       // 用公式，现场在 Excel 里改了格子，合计会跟着变
       ws.getCell(r, C_TOTAL).value = { formula: 'SUM(' + range + ')', result: row.total };
-      ws.getCell(r, C_DAYS).value = { formula: 'COUNTA(' + range + ')', result: row.days };
+      // 出勤天数留空，由用户自己填（客户要求）
     });
 
     ws.getCell(TOTAL_ROW, 1).value = '合计';
@@ -97,7 +97,7 @@
       const sumCol = (c, result) => ({ formula: 'SUM(' + L(c) + FIRST + ':' + L(c) + LAST_ROW + ')', result });
       rep.dates.forEach((d, j) => (ws.getCell(TOTAL_ROW, C_DAY0 + j).value = sumCol(C_DAY0 + j, rep.colTotals[d])));
       ws.getCell(TOTAL_ROW, C_TOTAL).value = sumCol(C_TOTAL, rep.grand);
-      ws.getCell(TOTAL_ROW, C_DAYS).value = sumCol(C_DAYS, rep.rows.reduce((s, x) => s + x.days, 0));
+      ws.getCell(TOTAL_ROW, C_DAYS).value = sumCol(C_DAYS, 0); // 填了天数，合计自己算出来
     }
 
     eachCell(ws, HEAD, 1, TOTAL_ROW, C_DAYS, (cell, r, c) => {
@@ -124,6 +124,10 @@
 
     ws.pageSetup = pageSetup('landscape', HEAD + ':' + WEEK);
     ws.headerFooter = { oddFooter: '&C第 &P 页 / 共 &N 页' };
+    // 给个人汇总用：按姓名到这张表里取「出勤天数」。按名字找而不是按格子地址，
+    // 用户在 Excel 里把考勤表重新排序后，个人汇总也不会张冠李戴
+    const col = (c) => "'" + ws.name + "'!$" + L(c) + '$' + FIRST + ':$' + L(c) + '$' + LAST_ROW;
+    return (nameCell) => 'INDEX(' + col(C_DAYS) + ',MATCH(' + nameCell + ',' + col(2) + ',0))';
   }
 
   // ---------- 明细（每条报工消息一行，方便对账） ----------
@@ -164,7 +168,7 @@
   }
 
   // ---------- 个人汇总 ----------
-  function addSummarySheet(wb, rep, info) {
+  function addSummarySheet(wb, rep, info, daysRef) {
     const types = rep.listTypes.length > 1 ? rep.listTypes : [];
     const hours = rep.metric === 'hours';
     const head = ['序号', '姓名', '出勤天数', '出勤次数']
@@ -175,12 +179,16 @@
     titleRows(ws, Object.assign({}, info, { title: info.title.replace('考勤统计表', '个人汇总') }), head.length);
     head.forEach((h, i) => (ws.getCell(3, i + 1).value = h));
     const values = rep.rows.map((row) =>
-      [row.days, row.count].concat(
+      [0, row.count].concat(
         types.map((t) => row.byType[t] || 0),
         hours ? [row.hours] : []
       )
     );
-    rep.rows.forEach((row, i) => (ws.getRow(4 + i).values = [row.no, row.name].concat(values[i])));
+    rep.rows.forEach((row, i) => {
+      ws.getRow(4 + i).values = [row.no, row.name].concat(values[i]);
+      // 出勤天数由用户在考勤表里自己填，这里跟着走，不用填两遍
+      ws.getCell(4 + i, 3).value = { formula: daysRef('B' + (4 + i)), result: 0 };
+    });
     const totalRow = 4 + rep.rows.length;
     ws.getCell(totalRow, 1).value = '合计';
     ws.mergeCells(totalRow, 1, totalRow, 2);
@@ -205,9 +213,9 @@
     const wb = new ExcelJS.Workbook();
     wb.creator = '工时统计';
     wb.created = new Date();
-    addMatrixSheet(wb, rep, info);
+    const daysRef = addMatrixSheet(wb, rep, info);
     addDetailSheet(wb, rep, info);
-    addSummarySheet(wb, rep, info);
+    addSummarySheet(wb, rep, info, daysRef);
     return wb;
   }
 
@@ -320,8 +328,7 @@
         if (s) g.fillText(s, mid(2 + j), cy);
       });
       g.font = 'bold 13px ' + FONT;
-      g.fillText(fmt(row.total), mid(2 + nDay), cy);
-      g.fillText(fmt(row.days), mid(3 + nDay), cy);
+      g.fillText(fmt(row.total), mid(2 + nDay), cy); // 天数一栏留空，由用户自己填
     });
     const ty = bottom - ROW_H / 2;
     g.font = 'bold 13px ' + FONT;
@@ -329,7 +336,6 @@
     g.fillText('合计', (x[0] + x[2]) / 2, ty);
     rep.dates.forEach((d, j) => g.fillText(fmt(rep.colTotals[d]), mid(2 + j), ty));
     g.fillText(fmt(rep.grand), mid(2 + nDay), ty);
-    g.fillText(fmt(rep.rows.reduce((s, r) => s + r.days, 0)), mid(3 + nDay), ty);
 
     // 网格线
     g.strokeStyle = '#b9bec6';
