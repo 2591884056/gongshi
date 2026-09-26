@@ -82,6 +82,8 @@ h2, h3 { margin: 0; }
 .banner-demo { background: var(--primary-weak); color: #173f99; }
 .banner-install { background: var(--primary-weak); color: #173f99; align-items: center; }
 .banner-install .btn { flex: none; }
+.banner-update { background: var(--ok-bg); color: #0d5c2e; align-items: center; }
+.banner-update .btn { flex: none; }
 .banner-close { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: inherit; padding: 0 2px; }
 
 .paste-box, .input {

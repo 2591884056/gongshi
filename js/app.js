@@ -258,7 +258,8 @@
     parseTimer = setTimeout(runParse, 350);
   }
 
-  function runParse() {
+  // uncheckedKeys：刷新页面前用户取消勾选的记录（见 reloadForUpdate），重新识别后保持不勾
+  function runParse(uncheckedKeys) {
     clearTimeout(parseTimer);
     const text = $('#paste-box').value;
     state.lastSaved = null;
@@ -268,6 +269,7 @@
       return;
     }
     const prevChecked = new Map(((state.parsed && state.parsed.records) || []).map((r) => [r.key, r._checked]));
+    if (Array.isArray(uncheckedKeys)) uncheckedKeys.forEach((k) => prevChecked.set(k, false));
     const res = P.parse(text, parseOpts());
     const savedKeys = new Set(state.records.map((r) => r.key));
     const savedSlots = new Map(state.records.filter((r) => r.slotKey).map((r) => [r.slotKey, r]));
@@ -1104,6 +1106,8 @@
         return;
       case 'install':
         return promptInstall();
+      case 'reload-update':
+        return reloadForUpdate();
       case 'roster-from-records':
         return rosterFromRecords();
       case 'backup-export':
@@ -1220,10 +1224,39 @@
     const hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.register('sw.js').catch((e) => console.warn('离线缓存没开起来', e));
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (hadController) toast('已更新到新版本，下次打开生效');
+      if (hadController) $('#update-tip').hidden = false; // 第一次装好时不提示，那时用的已经是最新的
       const v = $('#app-version');
       if (v) v.textContent = versionText();
     });
+  }
+
+  // 「立即刷新」：输入框里还没保存的内容、以及用户取消勾选了哪几条，先暂存，刷新后放回去
+  const DRAFT_KEY = 'gongshi.pasteDraft';
+  function reloadForUpdate() {
+    const text = $('#paste-box').value;
+    try {
+      if (text.trim()) {
+        const unchecked = ((state.parsed && state.parsed.records) || []).filter((r) => selectable(r) && !r._checked).map((r) => r.key);
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ text, unchecked }));
+      }
+    } catch (e) {
+      /* 存不了也照样刷新 */
+    }
+    flushSave();
+    location.reload();
+  }
+  function restoreDraft() {
+    let draft = null;
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      sessionStorage.removeItem(DRAFT_KEY); // 先删掉，坏了的数据也不会一直留着
+      draft = JSON.parse(raw || 'null');
+    } catch (e) {
+      return;
+    }
+    if (!draft || typeof draft.text !== 'string' || !draft.text.trim()) return;
+    $('#paste-box').value = draft.text;
+    runParse(draft.unchecked);
   }
 
   // 请浏览器把数据标成「持久」，不在空间紧张时自动清掉。只在保存记录后调用：有的浏览器会弹窗询问，得是用户操作之后
@@ -1282,6 +1315,7 @@
     updateBrand();
     bindEvents();
     route();
+    restoreDraft();
     registerSW();
     renderInstallTip();
     window.addEventListener('beforeinstallprompt', (e) => {

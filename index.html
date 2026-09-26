@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" translate="no" data-version="1fb2abc6e2">
+<html lang="zh-CN" translate="no" data-version="82f9d1b0a6">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/app.css?v=1fb2abc6e2">
+  <link rel="stylesheet" href="css/app.css?v=82f9d1b0a6">
 </head>
 <body>
   <header class="topbar">
@@ -33,6 +33,11 @@
   </header>
 
   <main class="container">
+    <div class="banner banner-update" id="update-tip" hidden>
+      <span><b>已更新到新版本</b>，刷新一下就能用上。</span>
+      <button class="btn btn-primary btn-sm" type="button" data-act="reload-update">立即刷新</button>
+      <button class="banner-close" type="button" data-act="close-banner" aria-label="关闭">×</button>
+    </div>
     <div class="banner banner-wechat" id="wechat-tip" hidden>
       <span><b>请在浏览器里打开：</b>点右上角「···」→「在浏览器打开」（苹果手机选「在 Safari 中打开」），再装到手机桌面，以后都从桌面图标打开。在微信里打开不能离线使用，数据也和浏览器里的分开存。</span>
       <button class="banner-close" type="button" data-act="close-banner" aria-label="关闭">×</button>
@@ -87,10 +92,10 @@
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="js/parser.js?v=1fb2abc6e2"></script>
-  <script src="js/report.js?v=1fb2abc6e2"></script>
-  <script src="js/exporter.js?v=1fb2abc6e2"></script>
-  <script src="js/sample.js?v=1fb2abc6e2"></script>
-  <script src="js/app.js?v=1fb2abc6e2"></script>
+  <script src="js/parser.js?v=82f9d1b0a6"></script>
+  <script src="js/report.js?v=82f9d1b0a6"></script>
+  <script src="js/exporter.js?v=82f9d1b0a6"></script>
+  <script src="js/sample.js?v=82f9d1b0a6"></script>
+  <script src="js/app.js?v=82f9d1b0a6"></script>
 </body>
 </html>

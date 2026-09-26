@@ -4,7 +4,7 @@
  * 发布时 scripts/build.js 会把 VERSION 换成文件内容的哈希。版本一变，手机下次联网打开时
  * 会在后台下载新版本、删掉旧缓存，再下次打开就是新版本，不用手动清缓存。
  */
-const VERSION = '1fb2abc6e2';
+const VERSION = '82f9d1b0a6';
 const CACHE = 'gongshi-' + VERSION;
 // 要缓存的文件；scripts/build.js 也按这份清单拷贝发布文件，只维护这一处
 const ASSETS = [
