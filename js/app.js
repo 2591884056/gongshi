@@ -29,11 +29,13 @@
   const MAX_DAYS = 62;
   const APP_VERSION = document.documentElement.dataset.version || 'dev'; // 发布包里由 scripts/build.js 填入
   const IS_STANDALONE = !!((window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone);
+  // 安卓：QQ 浏览器等能把 UA 改成 iPad / iPhone（平板上默认就是 iPad），这时 navigator.platform 还是 Linux
+  const IS_ANDROID = /Android/i.test(navigator.userAgent) || (/Linux/i.test(navigator.platform || '') && navigator.maxTouchPoints > 0);
   // 新款 iPad 的 UA 和 Mac 一样，只能靠「Mac + 触屏」认出来；先排除安卓
   const IS_IOS =
-    !/Android/i.test(navigator.userAgent) &&
-    (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-  const IS_ANDROID = /Android/i.test(navigator.userAgent);
+    !IS_ANDROID && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  // QQ 浏览器（X5 内核）：UA 带 MQQBrowser；改了 UA 也能从它往页面里塞的对象认出来（页面加载后才塞，要用时再判断）
+  const isQQBrowser = () => /MQQBrowser|QQBrowser/i.test(navigator.userAgent) || 'x5mtt' in window || 'qb_bridge' in window;
   const BACKUP_REMIND_DAYS = 30;
   const UNDO_SECONDS = 12;
 
@@ -342,7 +344,9 @@
         '<div class="notice paste-hint"><b>微信里多选复制了好几条？</b>在输入框里长按粘贴，安卓手机只能粘进第一条。' +
         '请点上面的「粘贴」按钮，在弹出的框里长按 →「粘贴」→「确定」，就能全部粘进来。</div>';
     } else if (state.pasteHint === 'android-multi') {
-      html += '<div class="notice paste-hint"><b>微信里多选复制了好几条？</b>这个浏览器只能读到第一条，所以下面只认出 1 条。可以这样：' + relaySteps + '</div>';
+      html +=
+        '<div class="notice paste-hint"><b>微信里多选复制了好几条？</b>' + (isQQBrowser() ? 'QQ 浏览器' : '这个浏览器') +
+        '一次只能读到第一条，所以下面只认出 1 条。可以这样：' + relaySteps + '</div>';
     } else if (state.pasteHint === 'android-flat') {
       html += '<div class="notice paste-hint"><b>粘进来的文字没有换行</b>，好几条连成了一行，下面认出来的可能不对。可以这样：' + relaySteps + '</div>';
     } else if (state.pasteHint === 'android-maybe') {
@@ -413,7 +417,10 @@
    *    paste 事件、clipboard.read() 都只拿到第一条。但安卓自己的输入框「粘贴」时会把所有项用换行拼起来，
    *    window.prompt() 弹出来的就是这种输入框，所以安卓上「粘贴」按钮改成弹框，让用户在框里长按粘贴。
    *    在安卓 16 模拟器上实测 Chrome 133、系统 WebView 133：弹框拿到了全部三项，换行也在
-   *    （框里显示成一行，取到的值里还是换行）。QQ 浏览器等自己画弹框的浏览器没测过。
+   *    （框里显示成一行，取到的值里还是换行）。
+   *  - QQ 浏览器 20.6.5（同一台模拟器实测）：弹框、网页输入框用的都是它自己的「粘贴」，只读第一项；
+   *    clipboard.read() 直接拒绝。只能叫用户先粘到手机自带的便签里，全选复制（这时剪贴板只剩一项）再粘回来。
+   *    它的「粘贴」不发 paste 事件，文字当成输入法打的字送进来（beforeinput 的 insertText）。
    */
   async function readClipboard() {
     const cb = navigator.clipboard;
@@ -437,26 +444,39 @@
     throw new Error('unsupported');
   }
 
+  /* 安卓上的「粘贴」弹框：boxShows 弹不弹得出来，boxAll 能不能一次拿到多选复制的全部。
+   * 拿不全（QQ 浏览器，或者看出来弹框只进来一条、吃掉了换行）时，说明和提醒都改成便签中转；
+   * 弹不出来（或者吃换行）时，「粘贴」按钮也不再弹框，改成直接读剪贴板 */
+  let boxShows = true;
+  let boxAll = true;
+  function distrustBox(shows) {
+    boxAll = false;
+    if (!shows) boxShows = false;
+    $('#paste-tip').textContent = pasteTip();
+  }
+  // QQ 浏览器往页面里塞对象要等一会儿，打开后再认一次
+  function noteBrowser() {
+    if (boxAll && isQQBrowser()) distrustBox(true);
+  }
+
   // 安卓：弹浏览器自带的输入框让用户粘贴。返回粘进来的文字；点了「取消」返回 null；
   // 浏览器不弹框（有的直接返回 null 或空字符串）返回 undefined，调用方改用 readClipboard()
-  let noPromptBox = false; // 弹框用不了或靠不住：「粘贴」按钮不再弹框，说明和提醒都改成便签中转
   function promptPaste() {
     const t0 = Date.now();
     let text;
     try {
-      text = window.prompt('长按下面的输入栏，点「粘贴」，再点「确定」。\n微信里多选复制的好几条，这样能一次全部粘进来。', '');
+      text = window.prompt(
+        '长按下面的输入栏，点「粘贴」，再点「确定」。' + (boxAll ? '\n微信里多选复制的好几条，这样能一次全部粘进来。' : ''),
+        ''
+      );
     } catch (e) {
       text = null;
     }
     if (!text && Date.now() - t0 < 300) {
-      dropPromptBox(); // 人点「取消」「确定」没这么快
+      distrustBox(false); // 人点「取消」「确定」没这么快
       return undefined;
     }
     return text;
-  }
-  function dropPromptBox() {
-    noPromptBox = true;
-    $('#paste-tip').textContent = pasteTip();
   }
 
   // 有几行像「9月7号打钻13人」的表头：有好几行却没认出好几条，是识别的问题，不是只粘进来一条
@@ -493,23 +513,27 @@
    * appending：输入框里原来就有字，这次是接在后面贴的。
    * 安卓上看情况提醒。「只复制了一条」和「多选复制却只进来第一条」文字上分不出来，所以提醒都写成
    * 「多选复制了好几条？」这种有条件的说法；接着往后贴（多半是在一条一条贴）时就不再提醒：
-   *  - 'native'、'read' 只能进第一条：没认出好几条就提醒。弹框能用，叫用户改点「粘贴」按钮；不能用，叫用户用便签中转；
-   *  - 弹框粘进来的没有换行、却有好几条的样子：换行被吃掉了；
-   *  - 弹框粘进来的带发送时间、却只认出 1 条：这个浏览器的弹框也只读到第一条。
-   *    这两种说明弹框靠不住，以后不再弹框（dropPromptBox）；
+   *  - 'native'、'read' 只能进第一条：没认出好几条就提醒。弹框拿得全，叫用户改点「粘贴」按钮；拿不全，叫用户用便签中转；
+   *  - 弹框拿不全（QQ 浏览器）：跟上面一样，叫用户用便签中转；
+   *  - 弹框粘进来的没有换行、却有好几条的样子：换行被吃掉了，以后不再弹框；
+   *  - 弹框粘进来的带发送时间、却只认出 1 条：这个浏览器的弹框也只读到第一条，以后当它拿不全；
    *  - 弹框粘进来只认出 1 条、又看不出是不是多选复制的：放一个点开才看的小提示。
    * 文字里有好几行表头却没认出好几条，是识别的问题，不提剪贴板。 */
   function afterPaste(text, via, appending) {
     state.pasteHint = null;
     if (IS_ANDROID && text.trim()) {
+      noteBrowser();
       if (via === 'prompt' && looksFlat(text)) {
         state.pasteHint = 'android-flat';
+        distrustBox(false);
       } else if (!appending && headLines(text) <= 1 && P.parse(text, parseOpts()).records.length <= 1) {
-        if (via === 'native') state.pasteHint = noPromptBox ? 'android-multi' : 'android-native';
-        else if (via === 'read') state.pasteHint = 'android-multi';
-        else state.pasteHint = P.countTimeLines(text) > 0 ? 'android-multi' : 'android-maybe';
+        if (via === 'native' && boxAll) state.pasteHint = 'android-native';
+        else if (via !== 'prompt' || !boxAll) state.pasteHint = 'android-multi';
+        else if (P.countTimeLines(text) > 0) {
+          state.pasteHint = 'android-multi';
+          distrustBox(true);
+        } else state.pasteHint = 'android-maybe';
       }
-      if (via === 'prompt' && (state.pasteHint === 'android-flat' || state.pasteHint === 'android-multi')) dropPromptBox();
     }
     runParse();
   }
@@ -519,7 +543,8 @@
     const box = $('#paste-box');
     const seq = ++pasteSeq;
     let clip;
-    if (IS_ANDROID && !noPromptBox) {
+    if (IS_ANDROID) noteBrowser();
+    if (IS_ANDROID && boxShows) {
       const text = promptPaste();
       if (text === null) return toast('已取消。没看到弹框的话，在输入框里长按 →「粘贴」');
       if (text !== undefined) {
@@ -549,6 +574,17 @@
     afterPaste(clip.text, clip.via, appending);
   }
 
+  // 选中的字会被粘进来的换掉，不算「原来就有字」
+  const hasOtherText = (box) => !!(box.value.slice(0, box.selectionStart) + box.value.slice(box.selectionEnd)).trim();
+
+  // QQ 浏览器的「粘贴」不发 paste 事件，文字当成输入法打的字送进来：一次进来好几行的，也按粘贴处理
+  function onBeforeInput(e) {
+    if (e.inputType !== 'insertText' || !e.data || e.data.indexOf('\n') < 0) return;
+    const text = e.data;
+    const appending = hasOtherText(e.target);
+    setTimeout(() => afterPaste(text, 'native', appending), 0);
+  }
+
   // 在输入框里长按粘贴 / Ctrl+V。苹果手机上改用 readClipboard() 把所有项都读出来
   function onNativePaste(e) {
     const box = e.target;
@@ -556,7 +592,7 @@
     const first = cd ? cd.getData('text/plain') : '';
     const start = box.selectionStart;
     const end = box.selectionEnd;
-    const appending = !!(box.value.slice(0, start) + box.value.slice(end)).trim(); // 选中的字会被换掉，不算
+    const appending = hasOtherText(box);
     if (!IS_IOS || !cd || !navigator.clipboard || !navigator.clipboard.read) {
       setTimeout(() => afterPaste(first, 'native', appending), 0);
       return;
@@ -1231,6 +1267,7 @@
     const box = $('#paste-box');
     box.addEventListener('input', scheduleParse);
     box.addEventListener('paste', onNativePaste);
+    box.addEventListener('beforeinput', onBeforeInput);
     $('#btn-clip').addEventListener('click', pasteFromClipboard);
     $('#btn-parse').addEventListener('click', () => {
       runParse();
@@ -1378,8 +1415,11 @@
   // 录入页输入框下面的说明，按手机类型说
   function pasteTip() {
     if (IS_IOS) return '在微信里长按消息 →「复制」（也可以多选好几条再点「复制」），回到这里点「粘贴」；手机会再弹一个「粘贴」，点一下。';
-    if (IS_ANDROID && noPromptBox)
-      return '在微信里长按消息 →「复制」，回到这里点「粘贴」。微信里「多选 → 复制」的，这个浏览器只能读到第一条：要先粘贴到手机自带的「便签」里，全选复制，回到这里在输入框里长按 →「粘贴」。';
+    if (IS_ANDROID && !boxAll)
+      return (
+        '在微信里长按消息 →「复制」，回到这里点「粘贴」。注意：微信里「多选 → 复制」的，' + (isQQBrowser() ? 'QQ 浏览器' : '这个浏览器') +
+        '一次只能粘进第一条，要先粘贴到手机自带的「便签」里，全选 → 复制，回到这里在输入框里长按 →「粘贴」。'
+      );
     if (IS_ANDROID)
       return '在微信里长按消息 →「复制」（也可以多选好几条再点「复制」），回到这里点「粘贴」，在弹出的框里长按 →「粘贴」→「确定」。微信里多选复制的，别直接在输入框里长按粘贴：安卓手机那样只能粘进第一条。';
     return '在电脑版微信里复制（也可以多选好几条再复制），这里按 Ctrl+V（Mac 按 ⌘V）或点「粘贴」。';
@@ -1390,6 +1430,10 @@
     if (DEMO && !state.records.length) seedDemo();
     $('#wechat-tip').hidden = !IS_WECHAT;
     $('#paste-tip').textContent = pasteTip();
+    if (IS_ANDROID) {
+      noteBrowser();
+      setTimeout(noteBrowser, 2000);
+    }
     $('#demo-bar').hidden = !DEMO;
     updateBadge();
     updateBrand();
