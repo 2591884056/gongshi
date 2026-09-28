@@ -211,6 +211,9 @@ table.rpt { border-collapse: separate; border-spacing: 0; font-size: 13px; font-
 .notice a { color: inherit; font-weight: 600; }
 .paste-hint { margin-bottom: 10px; line-height: 1.6; }
 .paste-hint ol { margin: 4px 0 0; padding-left: 20px; }
+.paste-hint-mini { margin-bottom: 10px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.paste-hint-mini summary { cursor: pointer; }
+.paste-hint-mini ol { margin: 4px 0 0; padding-left: 20px; }
 .sign { display: flex; flex-wrap: wrap; gap: 8px 48px; margin-top: 16px; font-size: 14px; }
 .sign span { white-space: nowrap; }
 .sign i { display: inline-block; width: 110px; border-bottom: 1px solid #333; vertical-align: -2px; }
