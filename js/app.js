@@ -411,7 +411,9 @@
 
   /* ---- 读剪贴板 ----
    * 手机微信「多选 → 复制」时，剪贴板里每条消息是单独的一项，浏览器默认只取第一项，
-   * 所以用户会觉得「粘贴不全」。实测（2026-09）：
+   * 所以用户会觉得「粘贴不全」。安卓版微信 8.0.78 安装包里的复制代码是这样写的：每条消息一项
+   * （图片、视频另外各一项文件），除了最后一项，每项文字末尾都加一个空行 "\n\n"，写完提示「已复制」。
+   * 实测（2026-09）：
    *  - 苹果手机：navigator.clipboard.read() 能读到所有项；长按粘贴时在 paste 事件里调用也不会再弹确认；
    *  - 安卓手机：浏览器内核只读剪贴板的第一项（Chromium、Firefox 的源码都是这么写的），网页里长按粘贴、
    *    paste 事件、clipboard.read() 都只拿到第一条。但安卓自己的输入框「粘贴」时会把所有项用换行拼起来，
@@ -511,25 +513,28 @@
 
   /* 粘贴之后识别。via：'prompt' 弹框粘进来的，'read' 用 readClipboard() 读的，'native' 浏览器自己粘进输入框的；
    * appending：输入框里原来就有字，这次是接在后面贴的。
-   * 安卓上看情况提醒。「只复制了一条」和「多选复制却只进来第一条」文字上分不出来，所以提醒都写成
-   * 「多选复制了好几条？」这种有条件的说法；接着往后贴（多半是在一条一条贴）时就不再提醒：
+   * 安卓上看情况提醒。只复制了一条，和多选复制却只进来第一条，大多数时候文字上分不出来，所以提醒都写成
+   * 「多选复制了好几条？」这种有条件的说法；接着往后贴（多半是在一条一条贴）时就不再提醒。
+   * 分得出来的一种：微信多选复制的每项末尾都有空行，只有最后一项没有（见上面「读剪贴板」），
+   * 所以粘进来的一段末尾带空行，就是只进来了第一项（cut），这时接着往后贴也提醒：
    *  - 'native'、'read' 只能进第一条：没认出好几条就提醒。弹框拿得全，叫用户改点「粘贴」按钮；拿不全，叫用户用便签中转；
    *  - 弹框拿不全（QQ 浏览器）：跟上面一样，叫用户用便签中转；
    *  - 弹框粘进来的没有换行、却有好几条的样子：换行被吃掉了，以后不再弹框；
-   *  - 弹框粘进来的带发送时间、却只认出 1 条：这个浏览器的弹框也只读到第一条，以后当它拿不全；
+   *  - 弹框粘进来的末尾带空行，或者带发送时间、却只认出 1 条：这个浏览器的弹框也只读到第一条，以后当它拿不全；
    *  - 弹框粘进来只认出 1 条、又看不出是不是多选复制的：放一个点开才看的小提示。
    * 文字里有好几行表头却没认出好几条，是识别的问题，不提剪贴板。 */
   function afterPaste(text, via, appending) {
     state.pasteHint = null;
     if (IS_ANDROID && text.trim()) {
       noteBrowser();
+      const cut = /\n[ \t]*\n\s*$/.test(text);
       if (via === 'prompt' && looksFlat(text)) {
         state.pasteHint = 'android-flat';
         distrustBox(false);
-      } else if (!appending && headLines(text) <= 1 && P.parse(text, parseOpts()).records.length <= 1) {
+      } else if ((!appending || cut) && headLines(text) <= 1 && P.parse(text, parseOpts()).records.length <= 1) {
         if (via === 'native' && boxAll) state.pasteHint = 'android-native';
         else if (via !== 'prompt' || !boxAll) state.pasteHint = 'android-multi';
-        else if (P.countTimeLines(text) > 0) {
+        else if (cut || P.countTimeLines(text) > 0) {
           state.pasteHint = 'android-multi';
           distrustBox(true);
         } else state.pasteHint = 'android-maybe';
